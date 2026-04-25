@@ -3,11 +3,8 @@ import matplotlib.pyplot as plt
 from data.loader import load_csv
 from orchestrator.codegen import generate_code, fix_code
 from execution.executor import execute_code
-
-
-@st.cache_data
-def cached_generate(columns, query, sample_data):
-    return generate_code(columns, query, sample_data)
+if "memory" not in st.session_state:
+    st.session_state.memory = []
 
 
 st.title("Data Analysis Bot")
@@ -35,7 +32,7 @@ query=st.text_input("Enter your query about the data")
 if query and uploaded_file is not None:
     columns=df.columns.to_list()
     try:
-        code=cached_generate(columns,query,sample_data)
+        code=generate_code(columns,query,sample_data,st.session_state.memory)
     except Exception as e:
         if "503" in str(e) or "UNAVAILABLE" in str(e):
             st.warning(" Model is very busy right now. Please wait a moment and try again.")
@@ -62,6 +59,13 @@ if query and uploaded_file is not None:
             else:
                 st.subheader("Result")
                 if output["result"] is not None:
+                    st.session_state.memory.append({
+                        "query": query,
+                        "code": code,
+                        "result": output["result"]
+                    })
+
+                    st.session_state.memory = st.session_state.memory[-20:]
                     st.write(output["result"])
                     if output["fig"] and len(plt.get_fignums()) > 0:
                         st.pyplot(output["fig"])
@@ -69,6 +73,18 @@ if query and uploaded_file is not None:
     else:
         st.subheader("Result")
         if output["result"] is not None:
+            st.session_state.memory.append({
+                        "query": query,
+                        "code": code,
+                        "result": output["result"]
+                    })
+
+            st.session_state.memory = st.session_state.memory[-20:]
             st.write(output["result"])
             if output["fig"] and len(plt.get_fignums()) > 0:
                 st.pyplot(output["fig"])
+
+    st.subheader("History")
+    for item in st.session_state.memory[::-1]:
+        st.write("Query:", item["query"])
+        st.write("Result:", item["result"])
