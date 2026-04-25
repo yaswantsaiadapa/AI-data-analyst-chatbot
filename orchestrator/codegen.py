@@ -1,7 +1,9 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.prompts import PromptTemplate
 from langchain_classic.chains import LLMChain
-from utils.prompts import CODEGEN_PROMPT, FIX_PROMPT
+from utils.prompts import CODEGEN_PROMPT, FIX_PROMPT, CLASSIFIER_PROMPT
+from utils.classifier import classify_query_rule
+from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import os
 import re
@@ -9,12 +11,13 @@ import re
 # Load API key
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
+groq_key=os.getenv("GROQ_API_KEY")
 
 # LLM setup
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+llm = ChatGroq(
+    model="llama-3.1-8b-instant",
     temperature=0,
-    google_api_key=api_key
+    api_key=os.getenv("GROQ_API_KEY")
 )
 
 # Prompts
@@ -28,10 +31,14 @@ fix_prompt = PromptTemplate(
     template=FIX_PROMPT
 )
 
+classifier_prompt = PromptTemplate(
+    input_variables=["query"],
+    template=CLASSIFIER_PROMPT
+)
 # Chains
 chain = LLMChain(llm=llm, prompt=prompt)
 fix_chain = LLMChain(llm=llm, prompt=fix_prompt)
-
+classifier_chain = LLMChain(llm=llm, prompt=classifier_prompt)
 
 # 🔥 INDENTATION FIXER (CORE)
 def fix_indentation(code: str) -> str:
@@ -73,7 +80,8 @@ def clean_code(response: str) -> str:
     response = response.replace(";", "\n")
 
     # Add newline before assignments
-    response = re.sub(r"(?<!\n)(\s)([a-zA-Z_]+\s*=)", r"\n\2", response)
+    response = re.sub(r"(?<!\n)(?<!,)(\s)([a-zA-Z_]+\s*=[^=])", r"\n\2", response)
+
 
     # Fix inline if-else
     response = re.sub(
@@ -90,9 +98,29 @@ def clean_code(response: str) -> str:
 
     return response
 
+def classify_query(query):
+    rule_type=classify_query_rule(query)
+    if rule_type=="general":
+        try:
+            response = classifier_chain.invoke({"query": query})
+            if isinstance(response, dict):
+                result = response.get("text", "").strip()
+            elif hasattr(response, "content"):
+                result = response.content.strip()
+            else:
+                result = str(response).strip()
+
+            return result.lower()
+        except:
+            return "general"
+    return rule_type
+
+
 
 # 🔹 Generate code
 def generate_code(columns, query, sample_data):
+    query_type = classify_query(query)
+    print("Query Type:", query_type)
     response = chain.invoke({
         "columns": columns,
         "query": query,
@@ -109,6 +137,7 @@ def generate_code(columns, query, sample_data):
     response = clean_code(response)
 
     return response
+
 
 
 # 🔹 Fix broken code

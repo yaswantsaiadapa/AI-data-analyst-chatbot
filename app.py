@@ -34,8 +34,18 @@ st.subheader("Ask a question")
 query=st.text_input("Enter your query about the data")
 if query and uploaded_file is not None:
     columns=df.columns.to_list()
-    code=cached_generate(columns,query,sample_data)
-    st.write("Raw LLM Output:", code)
+    try:
+        code=cached_generate(columns,query,sample_data)
+    except Exception as e:
+        if "503" in str(e) or "UNAVAILABLE" in str(e):
+            st.warning(" Model is very busy right now. Please wait a moment and try again.")
+            st.stop()
+        else:
+            st.error(f"Unexpected error: {e}")
+            st.stop()
+    st.write("Raw LLM Output:")
+    st.code(code, language="python")
+
 
     output,error=execute_code(code,df)
     if error:
@@ -43,7 +53,8 @@ if query and uploaded_file is not None:
         while(error and count<1):
             st.warning("Error Detected. Trying to Fix......")
             fixed_code=fix_code(code,error,columns,sample_data)
-            st.write("Fixed Code:",fixed_code)
+            st.write("Fixed Code:")
+            st.code(fixed_code, language="python")
             output,error=execute_code(fixed_code, df)
             if error:
                 st.error(f"Fixing Failed: {error}")

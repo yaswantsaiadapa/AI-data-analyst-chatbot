@@ -34,6 +34,8 @@ OUTPUT RULES:
 - Do NOT use print()
 - Do NOT import anything (pd and plt are already available)
 - Return ONLY executable Python code
+- Never assign 'result' more than once in the same if/else branch
+
 
 VISUALIZATION:
 - If the query requires a plot:
@@ -66,6 +68,7 @@ result = df.groupby("category")["sales"].sum()
 - ALWAYS put each Python statement on a separate line
 - NEVER combine multiple statements in one line
 - Each assignment must be on its own line
+-give only code as output no explanation
 """
 
 
@@ -86,6 +89,8 @@ RULES:
 - Do NOT import anything (pd and plt are already available)
 - Use ONLY the given column names (case-sensitive)
 - Store final output in variable 'result'
+ Do NOT recreate the DataFrame. The variable `df` already exists with the FULL dataset. Never call pd.DataFrame() or define a `data` dict.
+- Never assign the same variable more than once in the same block. Each variable must be set exactly ONCE per branch
 
 DATA HANDLING:
 - Always operate directly on df
@@ -106,4 +111,22 @@ VALIDATION:
 Ensure:
 - Code is syntactically correct
 - Code executes without errors
+"""
+
+
+CLASSIFIER_PROMPT = """
+You are a query classifier.
+
+Classify the user query into ONE of these categories:
+
+- filter
+- aggregation
+- groupby
+- comparison
+- plot
+- general
+
+Return ONLY the category name.
+
+Query: {query}
 """
