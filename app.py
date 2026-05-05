@@ -7,6 +7,7 @@ if "memory" not in st.session_state:
     st.session_state.memory = []
 
 
+
 st.title("Data Analysis Bot")
 uploaded_file=st.file_uploader("Upload CSV file",type=["csv"])
 if uploaded_file is not None:
@@ -48,8 +49,8 @@ if query and uploaded_file is not None:
     if error:
         count=0
         while(error and count<1):
-            st.warning("Error Detected. Trying to Fix......")
-            fixed_code=fix_code(code,error,columns,sample_data)
+            st.warning("Error Detected. Trying to Fix.....")
+            fixed_code=fix_code(code,error,columns,sample_data,st.session_state.memory)
             st.write("Fixed Code:")
             st.code(fixed_code, language="python")
             output,error=execute_code(fixed_code, df)
@@ -65,7 +66,7 @@ if query and uploaded_file is not None:
                         "result": output["result"]
                     })
 
-                    st.session_state.memory = st.session_state.memory[-20:]
+                    st.session_state.memory = st.session_state.memory[-5:]
                     st.write(output["result"])
                     if output["fig"] and len(plt.get_fignums()) > 0:
                         st.pyplot(output["fig"])
@@ -79,7 +80,7 @@ if query and uploaded_file is not None:
                         "result": output["result"]
                     })
 
-            st.session_state.memory = st.session_state.memory[-20:]
+            st.session_state.memory = st.session_state.memory[-5:]
             st.write(output["result"])
             if output["fig"] and len(plt.get_fignums()) > 0:
                 st.pyplot(output["fig"])

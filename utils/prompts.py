@@ -71,6 +71,11 @@ FORMATTING RULES:
 - Each statement must be on a new line
 - Each assignment must be on its own line
 
+
+- Do NOT define functions unless absolutely necessary
+- Always write top-level executable code
+- Ensure 'result' is defined at the global level
+
 EXAMPLES:
 
 # Example 1: aggregation

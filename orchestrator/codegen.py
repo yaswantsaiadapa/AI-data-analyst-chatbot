@@ -18,6 +18,12 @@ llm = ChatGroq(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
+gemini_llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0,
+    google_api_key=api_key
+)
+
 prompt = PromptTemplate(
     input_variables=["columns", "query", "sample_data","memory"],
     template=CODEGEN_PROMPT
@@ -36,6 +42,10 @@ classifier_prompt = PromptTemplate(
 chain = LLMChain(llm=llm, prompt=prompt)
 fix_chain = LLMChain(llm=llm, prompt=fix_prompt)
 classifier_chain = LLMChain(llm=llm, prompt=classifier_prompt)
+
+gemini_chain = LLMChain(llm=gemini_llm, prompt=prompt)
+gemini_fix_chain = LLMChain(llm=gemini_llm, prompt=fix_prompt)
+gemini_classifier_chain = LLMChain(llm=gemini_llm, prompt=classifier_prompt)
 
 def fix_indentation(code):
     lines = code.split("\n")
@@ -88,33 +98,47 @@ def clean_code(response: str) -> str:
     return response
 
 def classify_query(query):
-    rule_type=classify_query_rule(query)
-    if rule_type=="general":
+    rule_type = classify_query_rule(query)
+
+    if rule_type == "general":
         try:
             response = classifier_chain.invoke({"query": query})
-            if isinstance(response, dict):
-                result = response.get("text", "").strip()
-            elif hasattr(response, "content"):
-                result = response.content.strip()
-            else:
-                result = str(response).strip()
+        except Exception:
+            print("Groq classifier failed, switching to Gemini")
+            response = gemini_classifier_chain.invoke({"query": query})
 
-            return result.lower()
-        except:
-            return "general"
+        if isinstance(response, dict):
+            result = response.get("text", "").strip()
+        elif hasattr(response, "content"):
+            result = response.content.strip()
+        else:
+            result = str(response).strip()
+
+        return result.lower()
+
     return rule_type
 
 
-
-def generate_code(columns, query, sample_data,memory):
+def generate_code(columns, query, sample_data, memory):
     query_type = classify_query(query)
     print("Query Type:", query_type)
-    response = chain.invoke({
-        "columns": columns,
-        "query": query,
-        "sample_data": sample_data,
-        "memory":memory
-    })
+
+    try:
+        response = chain.invoke({
+            "columns": columns,
+            "query": query,
+            "sample_data": sample_data,
+            "memory": memory
+        })
+    except Exception as e:
+        print("Groq failed, switching to Gemini:", str(e))
+
+        response = gemini_chain.invoke({
+            "columns": columns,
+            "query": query,
+            "sample_data": sample_data,
+            "memory": memory
+        })
 
     if isinstance(response, dict):
         response = response.get("text", "").strip()
@@ -123,18 +147,27 @@ def generate_code(columns, query, sample_data,memory):
     else:
         response = str(response).strip()
 
-    response = clean_code(response)
+    return clean_code(response)
 
-    return response
+def fix_code(original_code, error, columns, sample_data, memory):
+    try:
+        response = fix_chain.invoke({
+            "original_code": original_code,
+            "error": error,
+            "columns": columns,
+            "sample_data": sample_data,
+            "memory": memory
+        })
+    except Exception as e:
+        print("Groq fix failed, switching to Gemini:", str(e))
 
-def fix_code(original_code, error, columns, sample_data):
-    response = fix_chain.invoke({
-        "original_code": original_code,
-        "error": error,
-        "columns": columns,
-        "sample_data": sample_data,
-        "memory":memory
-    })
+        response = gemini_fix_chain.invoke({
+            "original_code": original_code,
+            "error": error,
+            "columns": columns,
+            "sample_data": sample_data,
+            "memory": memory
+        })
 
     if isinstance(response, dict):
         response = response.get("text", "").strip()
@@ -143,6 +176,4 @@ def fix_code(original_code, error, columns, sample_data):
     else:
         response = str(response).strip()
 
-    response = clean_code(response)
-
-    return response
+    return clean_code(response)
