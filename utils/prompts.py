@@ -181,3 +181,26 @@ Return ONLY the category name.
 
 Query: {query}
 """
+
+
+ML_INTENT_PROMPT = """
+You are an expert data scientist.
+
+Given a user query, classify the machine learning task.
+
+Possible outputs:
+- regression
+- classification
+- clustering
+- none
+
+Rules:
+- regression → predicting continuous value
+- classification → predicting categories/labels
+- clustering → grouping without labels
+- none → if no ML required
+
+Return ONLY one word.
+
+Query: {query}
+"""

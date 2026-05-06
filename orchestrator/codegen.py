@@ -1,16 +1,17 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.prompts import PromptTemplate
 from langchain_classic.chains import LLMChain
-from utils.prompts import CODEGEN_PROMPT, FIX_PROMPT, CLASSIFIER_PROMPT
+from utils.prompts import CODEGEN_PROMPT, FIX_PROMPT, CLASSIFIER_PROMPT, ML_INTENT_PROMPT
 from utils.classifier import classify_query_rule
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import os
 import re
 
+
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
-groq_key=os.getenv("GROQ_API_KEY")
+groq_key = os.getenv("GROQ_API_KEY")
 
 llm = ChatGroq(
     model="llama-3.1-8b-instant",
@@ -25,12 +26,12 @@ gemini_llm = ChatGoogleGenerativeAI(
 )
 
 prompt = PromptTemplate(
-    input_variables=["columns", "query", "sample_data","memory"],
+    input_variables=["columns", "query", "sample_data", "memory"],
     template=CODEGEN_PROMPT
 )
 
 fix_prompt = PromptTemplate(
-    input_variables=["original_code", "error", "columns", "sample_data","memory"],
+    input_variables=["original_code", "error", "columns", "sample_data", "memory", "query"],
     template=FIX_PROMPT
 )
 
@@ -43,9 +44,60 @@ chain = LLMChain(llm=llm, prompt=prompt)
 fix_chain = LLMChain(llm=llm, prompt=fix_prompt)
 classifier_chain = LLMChain(llm=llm, prompt=classifier_prompt)
 
+ml_intent_chain = LLMChain(
+    llm=llm,
+    prompt=PromptTemplate(
+        input_variables=["query"],
+        template=ML_INTENT_PROMPT
+    )
+)
+
+gemini_ml_intent_chain = LLMChain(
+    llm=gemini_llm,
+    prompt=PromptTemplate(
+        input_variables=["query"],
+        template=ML_INTENT_PROMPT
+    )
+)
+
 gemini_chain = LLMChain(llm=gemini_llm, prompt=prompt)
 gemini_fix_chain = LLMChain(llm=gemini_llm, prompt=fix_prompt)
 gemini_classifier_chain = LLMChain(llm=gemini_llm, prompt=classifier_prompt)
+
+
+def detect_ml_task_smart(query):
+    try:
+        response = ml_intent_chain.invoke({"query": query})
+    except:
+        try:
+            response = gemini_ml_intent_chain.invoke({"query": query})
+        except:
+            return None
+
+    if isinstance(response, dict):
+        result = response.get("text", "").strip()
+    elif hasattr(response, "content"):
+        result = response.content.strip()
+    else:
+        result = str(response).strip()
+
+    return result.lower()
+
+
+def detect_ml_task(query):
+    q = query.lower()
+
+    if any(w in q for w in ["predict", "regression", "forecast"]):
+        return "regression"
+
+    if any(w in q for w in ["classify", "classification", "label"]):
+        return "classification"
+
+    if any(w in q for w in ["cluster", "group", "segmentation"]):
+        return "clustering"
+
+    return detect_ml_task_smart(query)
+
 
 def fix_indentation(code):
     lines = code.split("\n")
@@ -70,18 +122,14 @@ def fix_indentation(code):
     return "\n".join(fixed_lines)
 
 
-
 def clean_code(response: str) -> str:
     if not response:
         return ""
 
-    
     if response.startswith("```"):
         response = response.replace("```python", "").replace("```", "").strip()
 
-
     response = response.replace(";", "\n")
-
 
     response = re.sub(r"(?<!\n)(?<!,)(\s)([a-zA-Z_]+\s*=[^=])", r"\n\2", response)
 
@@ -92,10 +140,10 @@ def clean_code(response: str) -> str:
     )
 
     response = response.strip()
-
     response = fix_indentation(response)
 
     return response
+
 
 def classify_query(query):
     rule_type = classify_query_rule(query)
@@ -104,7 +152,6 @@ def classify_query(query):
         try:
             response = classifier_chain.invoke({"query": query})
         except Exception:
-            print("Groq classifier failed, switching to Gemini")
             response = gemini_classifier_chain.invoke({"query": query})
 
         if isinstance(response, dict):
@@ -121,21 +168,22 @@ def classify_query(query):
 
 def generate_code(columns, query, sample_data, memory):
     query_type = classify_query(query)
+    ml_task = detect_ml_task(query)
+
     print("Query Type:", query_type)
+    print("ML Task:", ml_task)
 
     try:
         response = chain.invoke({
             "columns": columns,
-            "query": query,
+            "query": f"{query}\n\nML Task Hint: {ml_task}",
             "sample_data": sample_data,
             "memory": memory
         })
     except Exception as e:
-        print("Groq failed, switching to Gemini:", str(e))
-
         response = gemini_chain.invoke({
             "columns": columns,
-            "query": query,
+            "query": f"{query}\n\nML Task Hint: {ml_task}",
             "sample_data": sample_data,
             "memory": memory
         })
@@ -149,24 +197,27 @@ def generate_code(columns, query, sample_data, memory):
 
     return clean_code(response)
 
-def fix_code(original_code, error, columns, sample_data, memory):
+
+def fix_code(original_code, error, columns, sample_data, memory, query):
+    ml_task = detect_ml_task(query)
+
     try:
         response = fix_chain.invoke({
             "original_code": original_code,
             "error": error,
             "columns": columns,
             "sample_data": sample_data,
-            "memory": memory
+            "memory": memory,
+            "query": f"ML Task Hint: {ml_task}"
         })
-    except Exception as e:
-        print("Groq fix failed, switching to Gemini:", str(e))
-
+    except Exception:
         response = gemini_fix_chain.invoke({
             "original_code": original_code,
             "error": error,
             "columns": columns,
             "sample_data": sample_data,
-            "memory": memory
+            "memory": memory,
+            "query": f"ML Task Hint: {ml_task}"
         })
 
     if isinstance(response, dict):

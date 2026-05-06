@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from data.loader import load_csv
 from orchestrator.codegen import generate_code, fix_code
 from execution.executor import execute_code
+from utils.classifier import compress_result
 if "memory" not in st.session_state:
     st.session_state.memory = []
 
@@ -50,7 +51,7 @@ if query and uploaded_file is not None:
         count=0
         while(error and count<1):
             st.warning("Error Detected. Trying to Fix.....")
-            fixed_code=fix_code(code,error,columns,sample_data,st.session_state.memory)
+            fixed_code=fix_code(code,error,columns,sample_data,st.session_state.memory,query)
             st.write("Fixed Code:")
             st.code(fixed_code, language="python")
             output,error=execute_code(fixed_code, df)
@@ -60,10 +61,11 @@ if query and uploaded_file is not None:
             else:
                 st.subheader("Result")
                 if output["result"] is not None:
+                    compressed = compress_result(output["result"])
                     st.session_state.memory.append({
                         "query": query,
                         "code": code,
-                        "result": output["result"]
+                        "result": compressed
                     })
 
                     st.session_state.memory = st.session_state.memory[-5:]
@@ -74,10 +76,11 @@ if query and uploaded_file is not None:
     else:
         st.subheader("Result")
         if output["result"] is not None:
+            compressed = compress_result(output["result"])
             st.session_state.memory.append({
                         "query": query,
                         "code": code,
-                        "result": output["result"]
+                        "result": compressed
                     })
 
             st.session_state.memory = st.session_state.memory[-5:]

@@ -1,3 +1,4 @@
+import pandas as pd
 def classify_query_rule(query):
     query=query.lower()
     if any(word in query for word in ["plot","chart","graph","visulaize"]):
@@ -12,3 +13,20 @@ def classify_query_rule(query):
             return "filter"
     
     return "general"
+
+
+def compress_result(res):
+    try:
+        if isinstance(res, pd.DataFrame):
+            if len(res) > 50:
+                return res.sample(50).to_dict()
+            return res.to_dict()
+
+        elif isinstance(res, pd.Series):
+            if len(res) > 50:
+                return res.sample(50).to_dict()
+            return res.to_dict()
+        return res
+    except:
+        return str(res)
+        
