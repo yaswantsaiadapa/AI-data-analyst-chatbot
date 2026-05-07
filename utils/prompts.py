@@ -204,3 +204,24 @@ Return ONLY one word.
 
 Query: {query}
 """
+
+
+EXPLAIN_PROMPT = """
+You are a professional data analyst.
+
+A user asked this question:
+{query}
+
+The following result was generated:
+{result}
+
+Explain the insights clearly and professionally.
+
+RULES:
+- Be concise and informative
+- Mention important trends and patterns
+- Explain anomalies if present
+- Explain ML results if present
+- Do NOT mention code
+- Use simple language understandable by non-technical users
+"""

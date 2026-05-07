@@ -4,9 +4,10 @@ from data.loader import load_csv
 from orchestrator.codegen import generate_code, fix_code
 from execution.executor import execute_code
 from utils.classifier import compress_result
+from orchestrator.explainer import generate_explanation
+
 if "memory" not in st.session_state:
     st.session_state.memory = []
-
 
 
 st.title("Data Analysis Bot")
@@ -70,6 +71,18 @@ if query and uploaded_file is not None:
 
                     st.session_state.memory = st.session_state.memory[-5:]
                     st.write(output["result"])
+                    try:
+                        explanation = generate_explanation(
+                            query,
+                            output["result"]
+                        )
+
+                        st.subheader("AI Explanation")
+
+                        st.write(explanation)
+
+                    except Exception as e:
+                        st.warning(f"Explanation generation failed: {e}")
                     if output["fig"] and len(plt.get_fignums()) > 0:
                         st.pyplot(output["fig"])
                 break
@@ -85,6 +98,19 @@ if query and uploaded_file is not None:
 
             st.session_state.memory = st.session_state.memory[-5:]
             st.write(output["result"])
+            try:
+                explanation = generate_explanation(
+                    query,
+                    output["result"]
+                )
+
+                st.subheader("AI Explanation")
+                st.write(explanation)
+
+            except Exception as e:
+                st.warning(f"Explanation generation failed: {e}")
+
+
             if output["fig"] and len(plt.get_fignums()) > 0:
                 st.pyplot(output["fig"])
 
