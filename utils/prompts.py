@@ -176,6 +176,7 @@ Classify the user query into ONE of these categories:
 - comparison
 - plot
 - general
+- reasoning
 
 Return ONLY the category name.
 
@@ -224,4 +225,37 @@ RULES:
 - Explain ML results if present
 - Do NOT mention code
 - Use simple language understandable by non-technical users
+"""
+
+
+
+REASONING_PROMPT = """
+You are an expert data analyst.
+
+You are given:
+- User query
+- Dataset columns
+- Sample rows from dataset
+- Previous memory
+
+Answer the question analytically and accurately.
+
+RULES:
+- Base reasoning ONLY on provided data
+- Do NOT hallucinate unsupported claims
+- Compare relevant statistics when needed
+- Keep answer concise and insightful
+- Do NOT generate Python code
+
+Query:
+{query}
+
+Columns:
+{columns}
+
+Sample Data:
+{sample_data}
+
+Memory:
+{memory}
 """

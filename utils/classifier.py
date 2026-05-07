@@ -10,8 +10,9 @@ def classify_query_rule(query):
     if any(word in query for word in ["compare", "difference", "vs", "versus"]):
         return "comparison"
     if any(word in query for word in ["show", "filter", "where", "less than", "greater than", "<", ">"]):
-            return "filter"
-    
+        return "filter"
+    if any(word in query for word in ["why","best","explain","reason","insight","significance","important","better"]):
+        return "reasoning"
     return "general"
 
 
@@ -29,4 +30,36 @@ def compress_result(res):
         return res
     except:
         return str(res)
+
+
+def summarize_dataframe(df):
+
+    try:
+
+        summary = {}
+
+        summary["columns"] = df.columns.tolist()
+
+        summary["shape"] = df.shape
+
+        numeric_df = df.select_dtypes(include="number")
+
+        if not numeric_df.empty:
+
+            summary["statistics"] = (
+                numeric_df.describe()
+                .round(2)
+                .to_dict()
+            )
+
+        summary["sample_rows"] = (
+            df.sample(min(20, len(df)))
+            .to_dict()
+        )
+
+        return str(summary)[:5000]
+
+    except Exception:
+
+        return str(df.head(20).to_dict())
         
